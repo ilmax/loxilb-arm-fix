@@ -13,7 +13,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: build for amd64/arm64
+    name: build for arm64
     steps:
     - uses: actions/checkout@v2
       with:
