@@ -1,79 +1,67 @@
-# Stage 1: Build patched eBPF objects
-FROM ubuntu:22.04 AS builder
+# Build patched loxilb eBPF objects for Armbian (with MAX_REAL_CPUS=4)
+# Based on official loxilb Dockerfile: https://github.com/loxilb-io/loxilb/blob/v0.9.8.4/Dockerfile
 
-# Install ALL dependencies for loxilb-ebpf build
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+ARG TAG=v0.9.8.4
+
+FROM ubuntu:22.04 AS build
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TAG
+
+# Install minimal build dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    wget \
     git \
-    clang-14 \
-    llvm-14 \
-    make \
-    gcc-arm-linux-gnueabihf \
-    pkg-config \
+    clang \
+    llvm \
     libelf-dev \
-    zlib1g-dev \
-    libbpf-dev \
+    build-essential \
+    pkg-config \
     libssl-dev \
-    m4 \
-    linux-headers-generic \
-    linux-tools-generic \
-    linux-tools-common \
-    libpcap-dev \
-    elfutils \
-    dwarves \
+    zlib1g-dev \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Set clang-14 and llc-14 as default
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100 && \
-    update-alternatives --install /usr/bin/llc llc /usr/bin/llc-14 100 && \
-    update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-14 100
+# Install bpftool (needed for eBPF build)
+RUN wget https://github.com/libbpf/bpftool/releases/download/v7.2.0/bpftool-libbpf-v7.2.0-sources.tar.gz && \
+    tar -xvzf bpftool-libbpf-v7.2.0-sources.tar.gz && \
+    cd bpftool/src/ && \
+    make clean && make -j $(nproc) && \
+    cp -f ./bpftool /usr/local/sbin/bpftool && \
+    cd ../.. && rm -fr bpftool*
 
-# Create bpftool symlink (linux-tools-generic installs it in a versioned directory)
-RUN ln -s /usr/lib/linux-tools/*/bpftool /usr/local/bin/bpftool || \
-    ln -s /usr/sbin/bpftool /usr/local/bin/bpftool || true
+# Clone loxilb with submodules
+RUN git clone --recurse-submodules --branch $TAG https://github.com/loxilb-io/loxilb /root/loxilb-io/loxilb/
 
-# Verify tools are available
-RUN which clang && which llc && which bpftool && bpftool version
+# Patch loxilb-ebpf to use MAX_REAL_CPUS=4 (instead of nproc which could be 16+)
+WORKDIR /root/loxilb-io/loxilb/loxilb-ebpf
+RUN sed -i 's/MAX_REAL_CPUS=16/MAX_REAL_CPUS=4/g' common/common.mk && \
+    echo "=== Patched common.mk ===" && grep "MAX_REAL_CPUS" common/common.mk
 
-# Clone main loxilb repo
-WORKDIR /build
-RUN git clone --depth 1 --branch v0.9.8.4 https://github.com/loxilb-io/loxilb.git
+# Build libbpf first (required dependency)
+RUN cd /root/loxilb-io/loxilb/loxilb-ebpf/libbpf/src && \
+    make clean && make -j$(nproc) && make install
 
-# Initialize and clone the loxilb-ebpf submodule
-WORKDIR /build/loxilb
-RUN git submodule update --init --recursive
+# Build only the eBPF kernel objects (not the userspace library)
+WORKDIR /root/loxilb-io/loxilb/loxilb-ebpf/kernel
+RUN make clean && \
+    make llb_xdp_main.o llb_ebpf_main.o llb_ebpf_emain.o llb_kern_sock.o llb_kern_sockstream.o llb_kern_sockdirect.o
 
-# Verify submodule structure
-RUN ls -la loxilb-ebpf/common/ && ls -la loxilb-ebpf/kernel/
+# Verify the built eBPF objects
+RUN ls -lh /root/loxilb-io/loxilb/loxilb-ebpf/kernel/*.o
 
-# Patch common/common.mk to hardcode MAX_REAL_CPUS=4
-WORKDIR /build/loxilb/loxilb-ebpf
-RUN sed -i 's/MAX_REAL_CPUS=16/MAX_REAL_CPUS=4/g' common/common.mk
+# Stage 2: Use official loxilb image and replace only the eBPF objects
+ARG TAG
+FROM ghcr.io/loxilb-io/loxilb:${TAG}
 
-# Show the bpftool line to understand its format
-RUN echo "=== Looking for bpftool command ===" && grep -n "bpftool" common/common.mk || echo "No bpftool in common.mk, checking elsewhere..."
+# Replace eBPF objects with our patched versions (MAX_REAL_CPUS=4 for Armbian)
+COPY --from=build /root/loxilb-io/loxilb/loxilb-ebpf/kernel/llb_xdp_main.o /opt/loxilb/llb_xdp_main.o
+COPY --from=build /root/loxilb-io/loxilb/loxilb-ebpf/kernel/llb_ebpf_main.o /opt/loxilb/llb_ebpf_main.o
+COPY --from=build /root/loxilb-io/loxilb/loxilb-ebpf/kernel/llb_ebpf_emain.o /opt/loxilb/llb_ebpf_emain.o
 
-# Verify the MAX_REAL_CPUS patch was applied
-RUN echo "=== Patched common.mk ===" && grep "MAX_REAL_CPUS" common/common.mk
+# Verify replacement
+RUN echo "=== Patched eBPF objects installed ===" && ls -lh /opt/loxilb/*.o
 
-# Build the eBPF objects from the kernel directory
-WORKDIR /build/loxilb/loxilb-ebpf/kernel
-
-# Now build - if it tries to regenerate vmlinux.h, our empty file will be overwritten
-# but if it fails, we have a fallback
-RUN make clean && make
-
-# Verify the built objects exist
-RUN echo "=== Built eBPF objects ===" && ls -lh *.o
-
-# Stage 2: Inject patched objects into official loxilb image
-FROM ghcr.io/loxilb-io/loxilb:v0.9.8.4
-
-# Replace the XDP object with our patched version (4 CPUs instead of 16)
-COPY --from=builder /build/loxilb/loxilb-ebpf/kernel/llb_xdp_main.o /opt/loxilb/llb_xdp_main.o
-
-# Also replace TC BPF objects to ensure consistency
-COPY --from=builder /build/loxilb/loxilb-ebpf/kernel/llb_ebpf_main.o /opt/loxilb/llb_ebpf_main.o
-COPY --from=builder /build/loxilb/loxilb-ebpf/kernel/llb_ebpf_emain.o /opt/loxilb/llb_ebpf_emain.o
-
-# Verify the files were replaced
-RUN echo "=== Installed patched eBPF objects ===" && ls -lh /opt/loxilb/*.o
+# Keep the same entrypoint as official image
+# ENTRYPOINT is inherited from base image
