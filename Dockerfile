@@ -4,10 +4,10 @@ FROM ubuntu:22.04 as builder
 # Install ALL dependencies for loxilb-ebpf build
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git \
-    clang \
-    llvm \
+    clang-14 \
+    llvm-14 \
     make \
-    gcc-multilib \
+    gcc-arm-linux-gnueabihf \
     pkg-config \
     libelf-dev \
     zlib1g-dev \
