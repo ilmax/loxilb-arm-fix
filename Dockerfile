@@ -17,7 +17,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     linux-headers-generic \
     linux-tools-generic \
     linux-tools-common \
-    linux-tools-$(uname -r) \
     libpcap-dev \
     elfutils \
     dwarves \
