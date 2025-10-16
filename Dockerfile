@@ -4,10 +4,10 @@ FROM ubuntu:22.04 as builder
 # Install ALL dependencies for loxilb-ebpf build
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     git \
-    clang-14 \
-    llvm-14 \
+    clang \
+    llvm \
     make \
-    gcc \
+    gcc-multilib \
     pkg-config \
     libelf-dev \
     zlib1g-dev \
@@ -17,12 +17,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     linux-headers-generic \
     linux-tools-generic \
     linux-tools-common \
-    && rm -rf /var/lib/apt/lists/*
+    linux-tools-$(uname -r) \
+    libpcap-dev \
+    elfutils \
+    dwarves
 
-# Set clang-14 and llc-14 as default
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100 && \
-    update-alternatives --install /usr/bin/llc llc /usr/bin/llc-14 100 && \
-    update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-14 100
+    && rm -rf /var/lib/apt/lists/*
 
 # Create bpftool symlink (linux-tools-generic installs it in a versioned directory)
 RUN ln -s /usr/lib/linux-tools/*/bpftool /usr/local/bin/bpftool || \
