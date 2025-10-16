@@ -1,5 +1,5 @@
 # Stage 1: Build patched eBPF objects
-FROM ubuntu:22.04 as builder
+FROM ubuntu:22.04 AS builder
 
 # Install ALL dependencies for loxilb-ebpf build
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -20,8 +20,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libpcap-dev \
     elfutils \
     dwarves \
-
     && rm -rf /var/lib/apt/lists/*
+
+# Set clang-14 and llc-14 as default
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100 && \
+    update-alternatives --install /usr/bin/llc llc /usr/bin/llc-14 100 && \
+    update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-14 100
 
 # Create bpftool symlink (linux-tools-generic installs it in a versioned directory)
 RUN ln -s /usr/lib/linux-tools/*/bpftool /usr/local/bin/bpftool || \
