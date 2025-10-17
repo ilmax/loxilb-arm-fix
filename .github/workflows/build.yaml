@@ -12,20 +12,25 @@ on:
         
 # Add permissions for GITHUB_TOKEN to push to GHCR
 permissions:
+  id-token: write
   contents: read
+  attestations: write
   packages: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     name: build for arm64
+    strategy:
+      matrix:
+        max_cpus: [2, 4, 8]
     steps:
     - uses: actions/checkout@v5
       with:
           submodules: recursive
 
     - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
+      uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
@@ -42,33 +47,59 @@ jobs:
     - name: Build Check
       if: |
           github.repository != 'ilmax/loxilb-arm-fix'
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
         context: .
         platforms: linux/arm64
         push: false
-        tags: ghcr.io/ilmax/loxilb:latest
+        build-args: MAX_REAL_CPUS=${{ matrix.max_cpus }}
+        tags: ghcr.io/ilmax/loxilb:latest-cpu${{ matrix.max_cpus }}
           
     - name: Build and push to latest
+      id: build-latest
       if: |
           github.repository == 'ilmax/loxilb-arm-fix' 
           &&  github.event.inputs.tagName == ''          
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
         context: .
         platforms: linux/arm64
         push: true
-        tags: ghcr.io/ilmax/loxilb:latest
+        build-args: MAX_REAL_CPUS=${{ matrix.max_cpus }}
+        tags: ghcr.io/ilmax/loxilb:latest-cpu${{ matrix.max_cpus }}
+
+    - name: Generate artifact attestation for latest
+      if: |
+          github.repository == 'ilmax/loxilb-arm-fix' 
+          &&  github.event.inputs.tagName == ''
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-name: ghcr.io/ilmax/loxilb
+        subject-digest: ${{ steps.build-latest.outputs.digest }}
+        push-to-registry: true
 
     - name: Build and push to given tag
+      id: build-tag
       if: |
           github.repository == 'ilmax/loxilb-arm-fix' 
           &&  github.event.inputs.tagName != ''          
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
         context: .
         platforms: linux/arm64
         push: true
-        build-args: TAG=${{ github.event.inputs.tagName }}
-        tags: ghcr.io/ilmax/loxilb:${{ github.event.inputs.tagName }}
+        build-args: |
+          TAG=${{ github.event.inputs.tagName }}
+          MAX_REAL_CPUS=${{ matrix.max_cpus }}
+        tags: ghcr.io/ilmax/loxilb:${{ github.event.inputs.tagName }}-cpu${{ matrix.max_cpus }}
+
+    - name: Generate artifact attestation for tag
+      if: |
+          github.repository == 'ilmax/loxilb-arm-fix' 
+          &&  github.event.inputs.tagName != ''
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-name: ghcr.io/ilmax/loxilb
+        subject-digest: ${{ steps.build-tag.outputs.digest }}
+        push-to-registry: true
     
