@@ -59,6 +59,37 @@ jobs:
     # Setup Docker Buildx for multi-arch images
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+
+    - name: Extract Docker metadata for latest
+      id: meta-latest
+      if: steps.extract_tag.outputs.is_tag == 'false'
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/ilmax/loxilb
+        tags: |
+          type=raw,value=latest-cpu${{ matrix.max_cpus }}
+        labels: |
+          org.opencontainers.image.title=loxilb-arm-fix
+          org.opencontainers.image.description=Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${{ matrix.max_cpus }}
+          org.opencontainers.image.vendor=ilmax
+          org.opencontainers.image.licenses=MIT
+          max_real_cpus=${{ matrix.max_cpus }}
+
+    - name: Extract Docker metadata for tag
+      id: meta-tag
+      if: steps.extract_tag.outputs.is_tag == 'true'
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/ilmax/loxilb
+        tags: |
+          type=raw,value=${{ steps.extract_tag.outputs.tag_name }}-cpu${{ matrix.max_cpus }}
+        labels: |
+          org.opencontainers.image.title=loxilb-arm-fix
+          org.opencontainers.image.description=Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${{ matrix.max_cpus }}
+          org.opencontainers.image.vendor=ilmax
+          org.opencontainers.image.licenses=MIT
+          max_real_cpus=${{ matrix.max_cpus }}
+          upstream_version=${{ steps.extract_tag.outputs.tag_name }}
       
     - name: Build Check
       if: |
@@ -82,7 +113,8 @@ jobs:
         platforms: linux/arm64
         push: true
         build-args: MAX_REAL_CPUS=${{ matrix.max_cpus }}
-        tags: ghcr.io/ilmax/loxilb:latest-cpu${{ matrix.max_cpus }}
+        tags: ${{ steps.meta-latest.outputs.tags }}
+        labels: ${{ steps.meta-latest.outputs.labels }}
 
     - name: Generate artifact attestation for latest
       if: |
@@ -107,7 +139,8 @@ jobs:
         build-args: |
           TAG=${{ steps.extract_tag.outputs.tag_name }}
           MAX_REAL_CPUS=${{ matrix.max_cpus }}
-        tags: ghcr.io/ilmax/loxilb:${{ steps.extract_tag.outputs.tag_name }}-cpu${{ matrix.max_cpus }}
+        tags: ${{ steps.meta-tag.outputs.tags }}
+        labels: ${{ steps.meta-tag.outputs.labels }}
 
     - name: Generate artifact attestation for tag
       if: |
