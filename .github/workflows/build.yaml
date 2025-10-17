@@ -77,6 +77,14 @@ jobs:
           org.opencontainers.image.description=Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${{ matrix.max_cpus }}
           org.opencontainers.image.vendor=ilmax
           org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.authors=Massimiliano Donini
+          max_real_cpus=${{ matrix.max_cpus }}
+        annotations: |
+          org.opencontainers.image.title=loxilb-arm-fix
+          org.opencontainers.image.description=Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${{ matrix.max_cpus }}
+          org.opencontainers.image.vendor=ilmax
+          org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.authors=Massimiliano Donini
           max_real_cpus=${{ matrix.max_cpus }}
 
     - name: Extract Docker metadata for tag
@@ -92,6 +100,15 @@ jobs:
           org.opencontainers.image.description=Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${{ matrix.max_cpus }}
           org.opencontainers.image.vendor=ilmax
           org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.authors=Massimiliano Donini
+          max_real_cpus=${{ matrix.max_cpus }}
+          upstream_version=${{ steps.extract_tag.outputs.tag_name }}
+        annotations: |
+          org.opencontainers.image.title=loxilb-arm-fix
+          org.opencontainers.image.description=Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${{ matrix.max_cpus }}
+          org.opencontainers.image.vendor=ilmax
+          org.opencontainers.image.licenses=MIT
+          org.opencontainers.image.authors=Massimiliano Donini
           max_real_cpus=${{ matrix.max_cpus }}
           upstream_version=${{ steps.extract_tag.outputs.tag_name }}
       
