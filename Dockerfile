@@ -60,18 +60,7 @@ FROM ghcr.io/loxilb-io/loxilb:${TAG}
 # Re-declare ARG after FROM to make it available in this stage
 ARG MAX_REAL_CPUS
 
-# Standard OCI Image Specification labels
-LABEL org.opencontainers.image.title="loxilb-arm-fix"
-LABEL org.opencontainers.image.description="Patched loxilb eBPF objects for ARM devices with MAX_REAL_CPUS=${MAX_REAL_CPUS} (Armbian compatible)"
-LABEL org.opencontainers.image.authors="Massimiliano Donini"
-LABEL org.opencontainers.image.vendor="ilmax"
-LABEL org.opencontainers.image.url="https://github.com/ilmax/loxilb-arm-fix"
-LABEL org.opencontainers.image.source="https://github.com/ilmax/loxilb-arm-fix"
-LABEL org.opencontainers.image.documentation="https://github.com/ilmax/loxilb-arm-fix/blob/main/README.md"
-LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.base.name="ghcr.io/loxilb-io/loxilb:${TAG}"
-
-# Replace eBPF objects with our patched versions (MAX_REAL_CPUS=${MAX_REAL_CPUS} for Armbian)
+# Replace eBPF objects with our patched versions (MAX_REAL_CPUS=${MAX_REAL_CPUS})
 COPY --from=build /root/loxilb-io/loxilb/loxilb-ebpf/kernel/llb_xdp_main.o /opt/loxilb/llb_xdp_main.o
 COPY --from=build /root/loxilb-io/loxilb/loxilb-ebpf/kernel/llb_ebpf_main.o /opt/loxilb/llb_ebpf_main.o
 COPY --from=build /root/loxilb-io/loxilb/loxilb-ebpf/kernel/llb_ebpf_emain.o /opt/loxilb/llb_ebpf_emain.o
