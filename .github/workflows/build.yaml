@@ -88,7 +88,7 @@ jobs:
       if: |
           github.repository == 'ilmax/loxilb-arm-fix' 
           && steps.extract_tag.outputs.is_tag == 'false'
-      uses: actions/attest-build-provenance@v1
+      uses: actions/attest-build-provenance@v3
       with:
         subject-name: ghcr.io/ilmax/loxilb
         subject-digest: ${{ steps.build-latest.outputs.digest }}
@@ -113,7 +113,7 @@ jobs:
       if: |
           github.repository == 'ilmax/loxilb-arm-fix' 
           && steps.extract_tag.outputs.is_tag == 'true'
-      uses: actions/attest-build-provenance@v1
+      uses: actions/attest-build-provenance@v3
       with:
         subject-name: ghcr.io/ilmax/loxilb
         subject-digest: ${{ steps.build-tag.outputs.digest }}
