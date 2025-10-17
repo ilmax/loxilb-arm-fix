@@ -24,9 +24,18 @@ jobs:
     name: Check and sync loxilb tags
     
     steps:
+    - name: Check if GitHub App credentials are available
+      id: check_app
+      run: |
+        if [[ -n "${{ vars.APP_ID }}" && -n "${{ secrets.APP_PRIVATE_KEY }}" ]]; then
+          echo "available=true" >> $GITHUB_OUTPUT
+        else
+          echo "available=false" >> $GITHUB_OUTPUT
+        fi
+
     - name: Generate GitHub App Token
       id: generate_token
-      if: vars.APP_ID != '' && secrets.APP_PRIVATE_KEY != ''
+      if: steps.check_app.outputs.available == 'true'
       uses: actions/create-github-app-token@v1
       with:
         app-id: ${{ vars.APP_ID }}
