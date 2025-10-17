@@ -1,0 +1,99 @@
+name: Sync Upstream Tags
+
+# This workflow checks for new loxilb releases and creates matching tags/releases
+# IMPORTANT: Requires either a GitHub App token or PAT_TOKEN to trigger the build workflow
+# Without one of these, releases will be created but the build workflow won't trigger
+# 
+# Recommended: Use GitHub App (more secure, better for orgs)
+# Alternative: Use PAT_TOKEN
+# 
+# Setup instructions in docs/SETUP_SYNC_WORKFLOW.md
+
+on:
+  schedule:
+    # Run every night at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-tags:
+    runs-on: ubuntu-latest
+    name: Check and sync loxilb tags
+    
+    steps:
+    - name: Generate GitHub App Token
+      id: generate_token
+      if: vars.APP_ID != '' && secrets.APP_PRIVATE_KEY != ''
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ vars.APP_ID }}
+        private-key: ${{ secrets.APP_PRIVATE_KEY }}
+    
+    - name: Checkout repository
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0  # Fetch all history and tags
+        token: ${{ steps.generate_token.outputs.token || secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+
+    - name: Check for new upstream tags
+      id: check_tags
+      run: |
+        # Get the latest release tag from loxilb-io/loxilb
+        LATEST_UPSTREAM_TAG=$(curl -s https://api.github.com/repos/loxilb-io/loxilb/releases/latest | jq -r '.tag_name')
+        
+        if [ -z "$LATEST_UPSTREAM_TAG" ] || [ "$LATEST_UPSTREAM_TAG" = "null" ]; then
+          echo "Failed to fetch latest upstream tag"
+          exit 1
+        fi
+        
+        echo "Latest upstream tag: $LATEST_UPSTREAM_TAG"
+        echo "latest_tag=$LATEST_UPSTREAM_TAG" >> $GITHUB_OUTPUT
+        
+        # Check if this tag already exists in our repo
+        if git rev-parse "$LATEST_UPSTREAM_TAG" >/dev/null 2>&1; then
+          echo "Tag $LATEST_UPSTREAM_TAG already exists in this repository"
+          echo "tag_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "Tag $LATEST_UPSTREAM_TAG does not exist in this repository"
+          echo "tag_exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create GitHub Release
+      if: steps.check_tags.outputs.tag_exists == 'false'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ steps.generate_token.outputs.token || secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.check_tags.outputs.latest_tag }}
+        release_name: Release ${{ steps.check_tags.outputs.latest_tag }}
+        body: |
+          Automated release synced from [loxilb-io/loxilb ${{ steps.check_tags.outputs.latest_tag }}](https://github.com/loxilb-io/loxilb/releases/tag/${{ steps.check_tags.outputs.latest_tag }})
+          
+          This release includes patched eBPF objects built with the following MAX_REAL_CPUS configurations:
+          - `${{ steps.check_tags.outputs.latest_tag }}-cpu2` - Optimized for 2 CPUs
+          - `${{ steps.check_tags.outputs.latest_tag }}-cpu4` - Optimized for 4 CPUs
+          - `${{ steps.check_tags.outputs.latest_tag }}-cpu8` - Optimized for 8 CPUs
+          
+          Docker images are available at:
+          - `ghcr.io/ilmax/loxilb:${{ steps.check_tags.outputs.latest_tag }}-cpu2`
+          - `ghcr.io/ilmax/loxilb:${{ steps.check_tags.outputs.latest_tag }}-cpu4`
+          - `ghcr.io/ilmax/loxilb:${{ steps.check_tags.outputs.latest_tag }}-cpu8`
+        draft: false
+        prerelease: false
+
+    - name: Summary
+      run: |
+        if [ "${{ steps.check_tags.outputs.tag_exists }}" = "false" ]; then
+          echo "### ✅ New Tag Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Created tag: **${{ steps.check_tags.outputs.latest_tag }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This will trigger the build workflow to create Docker images." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ℹ️ No Action Needed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tag **${{ steps.check_tags.outputs.latest_tag }}** already exists." >> $GITHUB_STEP_SUMMARY
+        fi
