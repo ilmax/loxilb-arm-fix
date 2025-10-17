@@ -50,6 +50,12 @@ WORKDIR /root/loxilb-io/loxilb/loxilb-ebpf/kernel
 RUN make clean && \
     make llb_xdp_main.o llb_ebpf_main.o llb_ebpf_emain.o llb_kern_sock.o llb_kern_sockstream.o llb_kern_sockdirect.o
 
+# Strip BTF information from eBPF objects to avoid kernel BTF validation issues
+RUN for obj in llb_xdp_main.o llb_ebpf_main.o llb_ebpf_emain.o llb_kern_sock.o llb_kern_sockstream.o llb_kern_sockdirect.o; do \
+        echo "Stripping BTF from $obj"; \
+        llvm-strip --strip-debug "$obj" || true; \
+    done
+    
 # Verify the built eBPF objects
 RUN ls -lh /root/loxilb-io/loxilb/loxilb-ebpf/kernel/*.o
 
