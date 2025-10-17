@@ -63,7 +63,7 @@ jobs:
     - name: Build Check
       if: |
           github.repository != 'ilmax/loxilb-arm-fix'
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/arm64
@@ -76,7 +76,7 @@ jobs:
       if: |
           github.repository == 'ilmax/loxilb-arm-fix' 
           && steps.extract_tag.outputs.is_tag == 'false'
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/arm64
@@ -99,7 +99,7 @@ jobs:
       if: |
           github.repository == 'ilmax/loxilb-arm-fix' 
           && steps.extract_tag.outputs.is_tag == 'true'
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: .
         platforms: linux/arm64
