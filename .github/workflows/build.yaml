@@ -31,7 +31,7 @@ jobs:
       matrix:
         max_cpus: [2, 4, 8]
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
           submodules: recursive
 
